@@ -517,7 +517,7 @@ func runUsingRuntime(options RunOptions, configureNetwork bool, moreCreateArgs [
 			}
 			// Add console socket arguments.
 			moreCreateArgs = append(moreCreateArgs, "--console-socket", socketPath)
-		} else {
+		} else if false {
 			copyPipes = true
 			// Figure out who should own the pipes.
 			uid, gid, err := util.GetHostRootIDs(spec)
