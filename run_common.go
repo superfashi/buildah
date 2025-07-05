@@ -1156,7 +1156,7 @@ func (b *Builder) runUsingRuntimeSubproc(isolation define.Isolation, options Run
 		Spec:             spec,
 		RootPath:         rootPath,
 		BundlePath:       bundlePath,
-		ConfigureNetwork: configureNetwork,
+		ConfigureNetwork: configureNetwork || options.StartedCallback != nil,
 		MoreCreateArgs:   moreCreateArgs,
 		ContainerName:    containerName,
 		Isolation:        isolation,
@@ -1196,7 +1196,7 @@ func (b *Builder) runUsingRuntimeSubproc(isolation define.Isolation, options Run
 	// create network configuration pipes
 	var containerCreateR, containerCreateW fileCloser
 	var containerStartR, containerStartW fileCloser
-	if configureNetwork {
+	if configureNetwork || options.StartedCallback != nil {
 		containerCreateR.file, containerCreateW.file, err = os.Pipe()
 		if err != nil {
 			return fmt.Errorf("creating container create pipe: %w", err)
@@ -1218,9 +1218,6 @@ func (b *Builder) runUsingRuntimeSubproc(isolation define.Isolation, options Run
 	defer pwriter.Close()
 
 	err = cmd.Start()
-	if options.ExecCallback != nil {
-		options.ExecCallback()
-	}
 	if err != nil {
 		return fmt.Errorf("while starting runtime: %w", err)
 	}
@@ -1235,7 +1232,7 @@ func (b *Builder) runUsingRuntimeSubproc(isolation define.Isolation, options Run
 	}()
 	signal.Notify(interrupted, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 
-	if configureNetwork {
+	if configureNetwork || options.StartedCallback != nil {
 		// we already passed the fd to the child, now close the writer so we do not hang if the child closes it
 		containerCreateW.Close()
 		if err := waitForSync(containerCreateR.file); err != nil {
@@ -1255,26 +1252,32 @@ func (b *Builder) runUsingRuntimeSubproc(isolation define.Isolation, options Run
 				return fmt.Errorf("parsing pid %s as a number: %w", string(pidValue), err)
 			}
 
-			teardown, netResult, err := b.runConfigureNetwork(pid, isolation, options, networkString, containerName, []string{spec.Hostname, buildContainerName})
-			if teardown != nil {
-				defer teardown()
-			}
-			if err != nil {
-				return fmt.Errorf("setup network: %w", err)
+			if options.StartedCallback != nil {
+				options.StartedCallback(pid)
 			}
 
-			// only add hosts if we manage the hosts file
-			if hostsFile != "" {
-				err = b.addHostsEntries(hostsFile, rootPath, netResult.entries, netResult.excludeIPs, netResult.preferredHostContainersInternalIP)
-				if err != nil {
-					return err
+			if configureNetwork {
+				teardown, netResult, err := b.runConfigureNetwork(pid, isolation, options, networkString, containerName, []string{spec.Hostname, buildContainerName})
+				if teardown != nil {
+					defer teardown()
 				}
-			}
-
-			if resolvFile != "" {
-				err = b.addResolvConfEntries(resolvFile, netResult.dnsServers, spec, netResult.keepHostResolvers, netResult.ipv6)
 				if err != nil {
-					return err
+					return fmt.Errorf("setup network: %w", err)
+				}
+
+				// only add hosts if we manage the hosts file
+				if hostsFile != "" {
+					err = b.addHostsEntries(hostsFile, rootPath, netResult.entries, netResult.excludeIPs, netResult.preferredHostContainersInternalIP)
+					if err != nil {
+						return err
+					}
+				}
+
+				if resolvFile != "" {
+					err = b.addResolvConfEntries(resolvFile, netResult.dnsServers, spec, netResult.keepHostResolvers, netResult.ipv6)
+					if err != nil {
+						return err
+					}
 				}
 			}
 

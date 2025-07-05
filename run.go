@@ -187,8 +187,9 @@ type RunOptions struct {
 	// made to contents of those changes when the container is subsequently
 	// committed.
 	CompatBuiltinVolumes types.OptionalBool
-	// ExecCallback is a function that will be called after the reexec if provided
-	ExecCallback func() `json:"-"`
+	// StartedCallback is a function that will be called after the process has
+	// been started, with the process ID of the started process.
+	StartedCallback func(pid int) `json:"-"`
 }
 
 // RunMountArtifacts are the artifacts created when using a run mount.
