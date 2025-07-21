@@ -1289,9 +1289,7 @@ func (b *Builder) runUsingRuntimeSubproc(isolation define.Isolation, options Run
 		}
 	}
 
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("while running runtime: %w", err)
-	}
+	err = cmd.Wait()
 	confwg.Wait()
 	signal.Stop(interrupted)
 	close(interrupted)
