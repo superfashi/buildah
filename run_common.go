@@ -1216,9 +1216,7 @@ func (b *Builder) runUsingRuntimeSubproc(isolation define.Isolation, options Run
 	cmd.ExtraFiles = append([]*os.File{preader}, cmd.ExtraFiles...)
 	defer preader.Close()
 	defer pwriter.Close()
-
-	err = cmd.Start()
-	if err != nil {
+	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("while starting runtime: %w", err)
 	}
 
